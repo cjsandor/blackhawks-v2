@@ -1,0 +1,79 @@
+
+-- Step 3: Create new tables and functions
+
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Create users table with password field
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    password TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create games table
+CREATE TABLE games (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    date DATE NOT NULL,
+    time TIME NOT NULL,
+    opponent TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create user_games table (junction table)
+CREATE TABLE user_games (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    game_id UUID REFERENCES games(id) ON DELETE CASCADE,
+    tickets INTEGER NOT NULL DEFAULT 0 CHECK (tickets >= 0),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, game_id)
+);
+
+-- Create indexes for better query performance
+CREATE INDEX idx_user_games_user_id ON user_games(user_id);
+CREATE INDEX idx_user_games_game_id ON user_games(game_id);
+
+-- Insert initial users with hashed passwords
+INSERT INTO users (email, name, password) VALUES
+('colinrmoody@outlook.com', 'Colin', crypt('blackhawks123', gen_salt('bf'))),
+('russell@weirdmedia.com', 'Russell', crypt('blackhawks123', gen_salt('bf'))),
+('samhallen@umich.edu', 'Sam', crypt('blackhawks123', gen_salt('bf'))),
+('cjsandor29@gmail.com', 'Charlie', crypt('blackhawks123', gen_salt('bf')));
+
+-- Function to create user_games entries for new games
+CREATE OR REPLACE FUNCTION create_user_games_for_new_game()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO user_games (user_id, game_id, tickets)
+    SELECT users.id, NEW.id, 0
+    FROM users;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to call the function when a new game is inserted
+CREATE TRIGGER create_user_games_trigger
+AFTER INSERT ON games
+FOR EACH ROW
+EXECUTE FUNCTION create_user_games_for_new_game();
+
+-- Enable Row Level Security (RLS) on tables
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE games ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_games ENABLE ROW LEVEL SECURITY;
+
+-- Create policies for each table
+-- Users can read all user data but only update their own
+CREATE POLICY users_read_all ON users FOR SELECT USING (true);
+CREATE POLICY users_update_own ON users FOR UPDATE USING (auth.uid() = id);
+
+-- All authenticated users can read game data
+CREATE POLICY games_read_all ON games FOR SELECT USING (auth.role() = 'authenticated');
+
+-- Users can read all user_games data but only update their own
+CREATE POLICY user_games_read_all ON user_games FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY user_games_update_own ON user_games FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY user_games_insert_own ON user_games FOR INSERT WITH CHECK (auth.uid() = user_id);

@@ -1,5 +1,5 @@
-
 // components/AttendanceTable.js
+
 import {
     Table,
     TableBody,

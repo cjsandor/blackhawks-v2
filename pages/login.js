@@ -1,3 +1,5 @@
+//pages/login.js
+
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';

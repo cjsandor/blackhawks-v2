@@ -1,4 +1,3 @@
-// components/FullSchedule.js
 import { 
     Table, 
     TableBody, 
@@ -31,7 +30,7 @@ const FullSchedule = ({ games, attendance, users, onToggleAttendance }) => {
                     <TableBody>
                         {games.map(game => {
                             const gameAttendance = attendance.filter(a => a.game_id === game.id);
-                            const availableTickets = gameAttendance.filter(a => a.status === 'not attending').length;
+                            const availableTickets = gameAttendance.reduce((sum, a) => sum + a.tickets, 0);
 
                             return (
                                 <TableRow key={game.id}>
@@ -39,25 +38,21 @@ const FullSchedule = ({ games, attendance, users, onToggleAttendance }) => {
                                     <TableCell>{game.time}</TableCell>
                                     <TableCell>{game.opponent}</TableCell>
                                     {users.map(user => {
-                                        const attendanceRecord = gameAttendance.find(a => a.user_id === user.id);
-                                        const status = attendanceRecord?.status || 'unknown';
+                                        const userAttendance = gameAttendance.find(a => a.user_id === user.id);
+                                        const attending = userAttendance && userAttendance.tickets === 0;
                                         return (
                                             <TableCell key={user.id}>
                                                 <Button 
                                                     variant="contained" 
                                                     style={{
-                                                        backgroundColor: status === 'attending' ? '#90EE90' : '#FFCCCB',
+                                                        backgroundColor: attending ? '#90EE90' : '#FFCCCB',
                                                         color: 'black',
                                                         width: '120px',
                                                         height: '36px'
                                                     }}
-                                                    onClick={() => onToggleAttendance(game.id, user.id, status)}
+                                                    onClick={() => onToggleAttendance(game.id, user.id, attending ? 'attending' : 'not attending')}
                                                 >
-                                                    {status === 'attending' ? 'Attending' : (
-                                                        <Typography variant="caption">
-                                                            Not Attending
-                                                        </Typography>
-                                                    )}
+                                                    {attending ? 'Attending' : 'Not Attending'}
                                                 </Button>
                                             </TableCell>
                                         );

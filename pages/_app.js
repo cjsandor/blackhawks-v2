@@ -1,3 +1,5 @@
+//pages/_app.js
+
 import '../styles/globals.css'
 import { useState, useEffect } from 'react'
 import { createTheme, ThemeProvider } from '@mui/material/styles';
@@ -52,25 +54,29 @@ function MyApp({ Component, pageProps }) {
   }
 
   const handleAuthChange = async (event, session) => {
-    await fetch('/api/auth', {
-      method: 'POST',
-      headers: new Headers({ 'Content-Type': 'application/json' }),
-      credentials: 'same-origin',
-      body: JSON.stringify({ event, session }),
-    })
-
     if (session?.user?.user_metadata?.force_password_change) {
-      setForcePasswordChange(true)
+      setForcePasswordChange(true);
     } else {
-      setForcePasswordChange(false)
+      setForcePasswordChange(false);
       if (event === 'SIGNED_IN' && router.pathname === '/login') {
-        router.push('/home')
+        router.push('/home');
       }
     }
   }
 
   if (isLoading) {
     return <div>Loading...</div>
+  }
+
+  if (!session) {
+    return (
+      <SessionContextProvider supabaseClient={supabaseClient} initialSession={null}>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <Component {...pageProps} />
+        </ThemeProvider>
+      </SessionContextProvider>
+    )
   }
 
   return (

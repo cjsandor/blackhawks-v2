@@ -1,3 +1,5 @@
+//components/ForcePasswordChange.js
+
 import { useState } from 'react';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { Box, TextField, Button, Typography } from '@mui/material';

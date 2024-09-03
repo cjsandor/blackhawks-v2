@@ -10,14 +10,21 @@ const HomePage = () => {
   const [games, setGames] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [users, setUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const user = useUser();
   const supabase = useSupabaseClient();
 
   useEffect(() => {
-    fetchGames();
-    fetchAttendance();
-    fetchUsers();
-  }, []);
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    await Promise.all([fetchGames(), fetchUserGames(), fetchUsers()]);
+    setIsLoading(false);
+  };
 
   const fetchGames = async () => {
     const { data, error } = await supabase
@@ -28,12 +35,12 @@ const HomePage = () => {
     else setGames(data);
   };
 
-  const fetchAttendance = async () => {
+  const fetchUserGames = async () => {
     const { data, error } = await supabase
-      .from('attendance')
+      .from('user_games')
       .select('*');
-    if (error) console.error('Error fetching attendance:', error);
-    else setAttendance(data);
+    if (error) console.error('Error fetching user_games:', error);
+    else setAttendance(data); // We'll use the attendance state to store user_games data
   };
 
   const fetchUsers = async () => {
@@ -49,58 +56,131 @@ const HomePage = () => {
     console.log('Game ID:', gameId);
     console.log('Ticket Count:', ticketCount);
     console.log('User ID:', userId);
-
+  
+    if (!userId) {
+      console.error('No user ID provided');
+      return;
+    }
+  
     try {
+      // First, check if the user exists
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', userId)
+        .single();
+  
+      if (userError || !userData) {
+        throw new Error('User not found');
+      }
+  
+      // Then, check if a record already exists in user_games
+      const { data: existingRecord, error: fetchError } = await supabase
+        .from('user_games')
+        .select('*')
+        .eq('game_id', gameId)
+        .eq('user_id', userId)
+        .single();
+  
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw fetchError;
+      }
+  
+      let newTickets = existingRecord ? existingRecord.tickets + ticketCount : ticketCount;
+  
       const { data, error } = await supabase
-        .from('attendance')
-        .update({ status: 'claimed' })
-        .match({ game_id: gameId, user_id: userId, status: 'not attending' })
-        .order('id', { ascending: true })
-        .limit(ticketCount);
-
+        .from('user_games')
+        .upsert({
+          game_id: gameId,
+          user_id: userId,
+          tickets: newTickets
+        }, {
+          onConflict: 'user_id,game_id'
+        })
+        .select();
+  
       console.log('Supabase response:', { data, error });
-
+  
       if (error) throw error;
-
+  
+      // Update local state
       setAttendance(prevAttendance => {
-        const newAttendance = prevAttendance.map(a => 
-          a.game_id === gameId && a.user_id === userId && a.status === 'not attending'
-            ? { ...a, status: 'claimed' }
+        const updatedAttendance = prevAttendance.map(a => 
+          a.game_id === gameId && a.user_id === userId
+            ? { ...a, tickets: newTickets }
             : a
         );
-        console.log('Updated attendance:', newAttendance);
-        return newAttendance;
+        if (!updatedAttendance.some(a => a.game_id === gameId && a.user_id === userId)) {
+          updatedAttendance.push(data[0]);
+        }
+        return updatedAttendance;
       });
-
+  
       console.log('Tickets claimed successfully');
     } catch (error) {
       console.error('Error claiming tickets:', error);
+      // You might want to show an error message to the user here
     }
   };
 
   const handleToggleAttendance = async (gameId, userId, currentStatus) => {
-    const newStatus = currentStatus === 'attending' ? 'not attending' : 'attending';
-    const { data, error } = await supabase
-      .from('attendance')
-      .upsert({ game_id: gameId, user_id: userId, status: newStatus }, { onConflict: ['game_id', 'user_id'] });
+    if (!user) {
+      console.error('No current user found');
+      return;
+    }
   
-    if (error) {
+    const newTickets = currentStatus === 'attending' ? 1 : 0;
+  
+    try {
+      const { data, error } = await supabase
+        .from('user_games')
+        .update({ tickets: newTickets })
+        .eq('game_id', gameId)
+        .eq('user_id', userId)
+        .select();
+  
+      if (error) throw error;
+  
+      setAttendance(prevAttendance => {
+        return prevAttendance.map(a => 
+          a.game_id === gameId && a.user_id === userId
+            ? { ...a, tickets: newTickets }
+            : a
+        );
+      });
+  
+    } catch (error) {
       console.error('Error updating attendance:', error);
-      alert(`Failed to update attendance: ${error.message}`);
-    } else {
-      fetchAttendance();
     }
   };
+
+  if (isLoading) {
+    return <Layout><Typography>Loading...</Typography></Layout>;
+  }
+
+  if (!user) {
+    return <Layout><Typography>Please log in to view this page.</Typography></Layout>;
+  }
 
   return (
     <Layout>
       <Typography variant="h4" gutterBottom>Home</Typography>
       <Grid container spacing={4}>
         <Grid item xs={12}>
-          <UpcomingGames games={games} attendance={attendance} onClaimTickets={onClaimTickets} userId={user.id} />
+          <UpcomingGames 
+            games={games} 
+            attendance={attendance} 
+            onClaimTickets={onClaimTickets} 
+            userId={user?.id} // Make sure we're using the correct user ID
+          />
         </Grid>
         <Grid item xs={12}>
-          <FullSchedule games={games} attendance={attendance} users={users} onToggleAttendance={handleToggleAttendance} />
+          <FullSchedule 
+            games={games} 
+            attendance={attendance} 
+            users={users} 
+            onToggleAttendance={handleToggleAttendance}
+          />
         </Grid>
       </Grid>
     </Layout>

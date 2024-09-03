@@ -1,3 +1,5 @@
+//components/UpcomingGames.js
+
 import React from 'react';
 import { 
   Typography, 
@@ -11,7 +13,6 @@ import {
 import { styled } from '@mui/system';
 import EventIcon from '@mui/icons-material/Event';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 
@@ -49,10 +50,6 @@ const GameCard = ({ opponent, date, time, availableTickets, onClaimTickets, game
   };
 
   const handleClaimTickets = () => {
-    console.log('Claim button clicked');
-    console.log('Game ID:', gameId);
-    console.log('Ticket Count:', ticketCount);
-    console.log('User ID:', userId);
     onClaimTickets(gameId, ticketCount, userId);
   };
 
@@ -103,8 +100,8 @@ const UpcomingGames = ({ games, attendance, onClaimTickets, userId }) => {
   const upcomingGames = games
     .filter(game => {
       const availableTickets = attendance
-        .filter(a => a.game_id === game.id && a.status === 'not attending')
-        .length;
+        .filter(a => a.game_id === game.id)
+        .reduce((sum, a) => sum + a.tickets, 0);
       return availableTickets > 0;
     })
     .slice(0, 6);
@@ -117,8 +114,8 @@ const UpcomingGames = ({ games, attendance, onClaimTickets, userId }) => {
       <Grid container spacing={3}>
         {upcomingGames.map(game => {
           const availableTickets = attendance
-            .filter(a => a.game_id === game.id && a.status === 'not attending')
-            .length;
+            .filter(a => a.game_id === game.id)
+            .reduce((sum, a) => sum + a.tickets, 0);
           
           return (
             <Grid item xs={12} sm={6} md={4} key={game.id}>
@@ -127,7 +124,7 @@ const UpcomingGames = ({ games, attendance, onClaimTickets, userId }) => {
                 date={game.date}
                 time={game.time}
                 availableTickets={availableTickets}
-                onClaimTickets={onClaimTickets}
+                onClaimTickets={(ticketCount) => onClaimTickets(game.id, ticketCount, userId)}
                 gameId={game.id}
                 userId={userId}
               />
