@@ -1,4 +1,3 @@
-// pages/attendance.js
 import { useState, useEffect } from 'react';
 import { Typography } from '@mui/material';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
@@ -16,7 +15,7 @@ const AttendancePage = () => {
   const fetchAttendanceData = async () => {
     const { data: users, error: usersError } = await supabase
       .from('users')
-      .select('*');
+      .select('id, name');
 
     if (usersError) {
       console.error('Error fetching users:', usersError);
@@ -25,42 +24,35 @@ const AttendancePage = () => {
 
     const { data: games, error: gamesError } = await supabase
       .from('games')
-      .select('*');
+      .select('id');
 
     if (gamesError) {
       console.error('Error fetching games:', gamesError);
       return;
     }
 
-    const { data: attendance, error: attendanceError } = await supabase
-      .from('attendance')
+    const { data: userGames, error: userGamesError } = await supabase
+      .from('user_games')
       .select('*');
 
-    if (attendanceError) {
-      console.error('Error fetching attendance:', attendanceError);
+    if (userGamesError) {
+      console.error('Error fetching user_games:', userGamesError);
       return;
     }
 
-    const { data: claims, error: claimsError } = await supabase
-      .from('claims')
-      .select('*');
-
-    if (claimsError) {
-      console.error('Error fetching claims:', claimsError);
-      return;
-    }
+    const totalGames = games.length;
 
     const attendanceData = users.map(user => {
-      const gamesAttended = attendance.filter(a => a.user_id === user.id && a.status === 'attending').length;
-      const ticketsClaimed = claims.filter(c => c.user_id === user.id).reduce((sum, claim) => sum + claim.tickets_claimed, 0);
-      const totalAllocatedTickets = games.length;
-      const delta = totalAllocatedTickets - gamesAttended - ticketsClaimed;
+      const userGameData = userGames.filter(ug => ug.user_id === user.id);
+      const gamesAttended = userGameData.filter(ug => ug.tickets === 0).length;
+      const ticketsClaimed = userGameData.reduce((sum, ug) => sum + (ug.tickets > 1 ? ug.tickets : 0), 0);      
+      const delta = totalGames - gamesAttended - ticketsClaimed;
 
       return {
         ticketHolder: user.name,
         gamesAttended,
         ticketsClaimed,
-        totalAllocatedTickets,
+        totalAllocatedTickets: totalGames,
         delta
       };
     });
