@@ -15,48 +15,47 @@ const AttendancePage = () => {
   const fetchAttendanceData = async () => {
     const { data: users, error: usersError } = await supabase
       .from('users')
-      .select('id, name');
-
+      .select('*');
+  
     if (usersError) {
       console.error('Error fetching users:', usersError);
       return;
     }
-
+  
     const { data: games, error: gamesError } = await supabase
       .from('games')
-      .select('id');
-
+      .select('*');
+  
     if (gamesError) {
       console.error('Error fetching games:', gamesError);
       return;
     }
-
+  
     const { data: userGames, error: userGamesError } = await supabase
       .from('user_games')
       .select('*');
-
+  
     if (userGamesError) {
       console.error('Error fetching user_games:', userGamesError);
       return;
     }
-
-    const totalGames = games.length;
-
+  
     const attendanceData = users.map(user => {
-      const userGameData = userGames.filter(ug => ug.user_id === user.id);
-      const gamesAttended = userGameData.filter(ug => ug.tickets === 0).length;
-      const ticketsClaimed = userGameData.reduce((sum, ug) => sum + (ug.tickets > 1 ? ug.tickets : 0), 0);      
-      const delta = totalGames - gamesAttended - ticketsClaimed;
-
+      const userGameRecords = userGames.filter(ug => ug.user_id === user.id);
+      const gamesAttended = userGameRecords.filter(ug => ug.tickets === 0).length;
+      const ticketsClaimed = userGameRecords.reduce((sum, ug) => sum + ug.tickets, 0);
+      const totalAllocatedTickets = games.length;
+      const delta = totalAllocatedTickets - gamesAttended - ticketsClaimed;
+  
       return {
         ticketHolder: user.name,
         gamesAttended,
         ticketsClaimed,
-        totalAllocatedTickets: totalGames,
+        totalAllocatedTickets,
         delta
       };
     });
-
+  
     setAttendanceData(attendanceData);
   };
 

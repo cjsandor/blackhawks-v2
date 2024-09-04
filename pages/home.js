@@ -8,11 +8,47 @@ import FullSchedule from '../components/FullSchedule';
 
 const HomePage = () => {
   const [games, setGames] = useState([]);
-  const [attendance, setAttendance] = useState([]);
+  const [userGames, setUserGames] = useState([]);
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const user = useUser();
   const supabase = useSupabaseClient();
+
+  useEffect(() => {
+    if (user) {
+      console.log('Authenticated user:', user);
+      // Verify if this user exists in the database
+      const checkUser = async () => {
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, email')
+          .eq('id', user.id);
+        
+        console.log('Database user check:', { data, error });
+        
+        if (error) {
+          console.error('Error checking user:', error);
+        } else if (data && data.length > 0) {
+          console.log('User found in database:', data[0]);
+        } else {
+          console.log('User not found in database. Attempting to add...');
+          // Attempt to add the user to the database
+          const { data: newUser, error: insertError } = await supabase
+            .from('users')
+            .insert({ id: user.id, email: user.email, name: user.user_metadata.name })
+            .select();
+          
+          if (insertError) {
+            console.error('Error inserting new user:', insertError);
+          } else {
+            console.log('New user inserted successfully:', newUser);
+          }
+        }
+      };
+      
+      checkUser();
+    }
+  }, [user, supabase]);
 
   useEffect(() => {
     if (user) {
@@ -22,8 +58,13 @@ const HomePage = () => {
 
   const fetchData = async () => {
     setIsLoading(true);
-    await Promise.all([fetchGames(), fetchUserGames(), fetchUsers()]);
-    setIsLoading(false);
+    try {
+      await Promise.all([fetchGames(), fetchUserGames(), fetchUsers()]);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const fetchGames = async () => {
@@ -40,7 +81,7 @@ const HomePage = () => {
       .from('user_games')
       .select('*');
     if (error) console.error('Error fetching user_games:', error);
-    else setAttendance(data); // We'll use the attendance state to store user_games data
+    else setUserGames(data);
   };
 
   const fetchUsers = async () => {
@@ -51,106 +92,82 @@ const HomePage = () => {
     else setUsers(data);
   };
 
-  const onClaimTickets = async (gameId, ticketCount, userId) => {
-    console.log('onClaimTickets called');
-    console.log('Game ID:', gameId);
-    console.log('Ticket Count:', ticketCount);
-    console.log('User ID:', userId);
-  
-    if (!userId) {
-      console.error('No user ID provided');
-      return;
-    }
-  
+  const handleToggleAttendance = async (gameId, userId, currentStatus) => {
+    const newTickets = currentStatus === 'attending' ? 0 : 1;
     try {
-      // First, check if the user exists
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', userId)
-        .single();
-  
-      if (userError || !userData) {
-        throw new Error('User not found');
-      }
-  
-      // Then, check if a record already exists in user_games
+      const { data, error } = await supabase
+        .from('user_games')
+        .upsert({ 
+          game_id: gameId, 
+          user_id: userId, 
+          tickets: newTickets 
+        }, { onConflict: 'game_id,user_id' })
+        .select();
+
+      if (error) throw error;
+
+      setUserGames(prevUserGames => {
+        const existingIndex = prevUserGames.findIndex(ug => ug.game_id === gameId && ug.user_id === userId);
+        if (existingIndex !== -1) {
+          return prevUserGames.map((ug, index) => 
+            index === existingIndex ? { ...ug, tickets: newTickets } : ug
+          );
+        } else {
+          return [...prevUserGames, data[0]];
+        }
+      });
+    } catch (error) {
+      console.error('Error toggling attendance:', error);
+    }
+  };
+
+  const handleClaimTickets = async (gameId, ticketCount, userId, availableTickets) => {
+    try {
       const { data: existingRecord, error: fetchError } = await supabase
         .from('user_games')
-        .select('*')
+        .select('tickets')
         .eq('game_id', gameId)
         .eq('user_id', userId)
         .single();
-  
+
       if (fetchError && fetchError.code !== 'PGRST116') {
         throw fetchError;
       }
-  
-      let newTickets = existingRecord ? existingRecord.tickets + ticketCount : ticketCount;
-  
+
+      const currentTickets = existingRecord ? existingRecord.tickets : 0;
+      const newTickets = currentTickets + ticketCount;
+
+      if (newTickets > availableTickets + 1) {
+        throw new Error('Not enough tickets available');
+      }
+
       const { data, error } = await supabase
         .from('user_games')
         .upsert({
           game_id: gameId,
           user_id: userId,
           tickets: newTickets
-        }, {
-          onConflict: 'user_id,game_id'
-        })
+        }, { onConflict: 'game_id,user_id' })
         .select();
-  
-      console.log('Supabase response:', { data, error });
-  
+
       if (error) throw error;
-  
-      // Update local state
-      setAttendance(prevAttendance => {
-        const updatedAttendance = prevAttendance.map(a => 
-          a.game_id === gameId && a.user_id === userId
-            ? { ...a, tickets: newTickets }
-            : a
+
+      setUserGames(prevUserGames => {
+        const updatedUserGames = prevUserGames.map(ug => 
+          ug.game_id === gameId && ug.user_id === userId
+            ? { ...ug, tickets: newTickets }
+            : ug
         );
-        if (!updatedAttendance.some(a => a.game_id === gameId && a.user_id === userId)) {
-          updatedAttendance.push(data[0]);
+        if (!updatedUserGames.some(ug => ug.game_id === gameId && ug.user_id === userId)) {
+          updatedUserGames.push(data[0]);
         }
-        return updatedAttendance;
+        return updatedUserGames;
       });
-  
-      console.log('Tickets claimed successfully');
+
+      return { success: true, message: 'Tickets claimed successfully' };
     } catch (error) {
       console.error('Error claiming tickets:', error);
-      // You might want to show an error message to the user here
-    }
-  };
-
-  const handleToggleAttendance = async (gameId, userId, currentStatus) => {
-    if (!user) {
-      console.error('No current user found');
-      return;
-    }
-  
-    const newTickets = currentStatus === 'attending' ? 1 : 0;
-  
-    try {
-      const { data, error } = await supabase
-        .from('user_games')
-        .update({ tickets: newTickets })
-        .eq('game_id', gameId)
-        .eq('user_id', userId)
-        .select();
-  
-      if (error) throw error;
-  
-      setAttendance(prevAttendance => {
-        return prevAttendance.map(a => 
-          a.game_id === gameId && a.user_id === userId
-            ? { ...a, tickets: newTickets }
-            : a
-        );
-      });
-  
-    } catch (error) {
-      console.error('Error updating attendance:', error);
+      return { success: false, message: error.message || 'Error claiming tickets' };
     }
   };
 
@@ -169,15 +186,15 @@ const HomePage = () => {
         <Grid item xs={12}>
           <UpcomingGames 
             games={games} 
-            attendance={attendance} 
-            onClaimTickets={onClaimTickets} 
-            userId={user?.id} // Make sure we're using the correct user ID
+            userGames={userGames} 
+            onClaimTickets={handleClaimTickets} 
+            userId={user.id}
           />
         </Grid>
         <Grid item xs={12}>
           <FullSchedule 
             games={games} 
-            attendance={attendance} 
+            userGames={userGames} 
             users={users} 
             onToggleAttendance={handleToggleAttendance}
           />

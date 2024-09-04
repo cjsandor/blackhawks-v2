@@ -8,7 +8,7 @@ import {
   CardContent, 
   Button, 
   Box,
-  IconButton, // Add this line
+  IconButton, 
 } from '@mui/material';
 import { styled } from '@mui/system';
 import EventIcon from '@mui/icons-material/Event';
@@ -36,6 +36,7 @@ const StyledButton = styled(Button)(({ theme }) => ({
 
 const GameCard = ({ opponent, date, time, availableTickets, onClaimTickets, gameId, userId }) => {
   const [ticketCount, setTicketCount] = React.useState(1);
+  const [message, setMessage] = React.useState('');
 
   const handleIncrement = () => {
     if (ticketCount < availableTickets) {
@@ -49,8 +50,12 @@ const GameCard = ({ opponent, date, time, availableTickets, onClaimTickets, game
     }
   };
 
-  const handleClaimTickets = () => {
-    onClaimTickets(gameId, ticketCount, userId);
+  const handleClaimTickets = async () => {
+    const result = await onClaimTickets(gameId, ticketCount, userId, availableTickets);
+    setMessage(result.message);
+    if (result.success) {
+      setTicketCount(1);
+    }
   };
 
   return (
@@ -91,17 +96,23 @@ const GameCard = ({ opponent, date, time, availableTickets, onClaimTickets, game
         >
           CLAIM {ticketCount} TICKET{ticketCount > 1 ? 'S' : ''}
         </StyledButton>
+        {message && <Typography color={message.includes('successfully') ? 'success' : 'error'}>{message}</Typography>}
       </CardContent>
     </StyledCard>
   );
 };
 
-const UpcomingGames = ({ games, attendance, onClaimTickets, userId }) => {
+const UpcomingGames = ({ games, userGames, onClaimTickets, userId }) => {
+  const calculateAvailableTickets = (gameId) => {
+    const maxTickets = 4;
+    const gameUserGames = userGames.filter(ug => ug.game_id === gameId);
+    const claimedTickets = gameUserGames.reduce((sum, ug) => sum + ug.tickets, 0);
+    return Math.max(0, maxTickets - claimedTickets);
+  };
+
   const upcomingGames = games
     .filter(game => {
-      const availableTickets = attendance
-        .filter(a => a.game_id === game.id)
-        .reduce((sum, a) => sum + a.tickets, 0);
+      const availableTickets = calculateAvailableTickets(game.id);
       return availableTickets > 0;
     })
     .slice(0, 6);
@@ -113,9 +124,7 @@ const UpcomingGames = ({ games, attendance, onClaimTickets, userId }) => {
       </Typography>
       <Grid container spacing={3}>
         {upcomingGames.map(game => {
-          const availableTickets = attendance
-            .filter(a => a.game_id === game.id)
-            .reduce((sum, a) => sum + a.tickets, 0);
+          const availableTickets = calculateAvailableTickets(game.id);
           
           return (
             <Grid item xs={12} sm={6} md={4} key={game.id}>
@@ -124,7 +133,7 @@ const UpcomingGames = ({ games, attendance, onClaimTickets, userId }) => {
                 date={game.date}
                 time={game.time}
                 availableTickets={availableTickets}
-                onClaimTickets={(ticketCount) => onClaimTickets(game.id, ticketCount, userId)}
+                onClaimTickets={onClaimTickets}
                 gameId={game.id}
                 userId={userId}
               />

@@ -10,7 +10,13 @@ import {
     Button
 } from '@mui/material';
 
-const FullSchedule = ({ games, attendance, users, onToggleAttendance }) => {
+const FullSchedule = ({ games, userGames, users, onToggleAttendance }) => {
+    const calculateAvailableTickets = (gameUserGames) => {
+        const maxTickets = 4;
+        const claimedTickets = gameUserGames.reduce((sum, ug) => sum + ug.tickets, 0);
+        return Math.max(0, maxTickets - claimedTickets);
+    };
+
     return (
         <>
             <Typography variant="h5" gutterBottom align="center">Full Schedule</Typography>
@@ -29,8 +35,8 @@ const FullSchedule = ({ games, attendance, users, onToggleAttendance }) => {
                     </TableHead>
                     <TableBody>
                         {games.map(game => {
-                            const gameAttendance = attendance.filter(a => a.game_id === game.id);
-                            const availableTickets = gameAttendance.reduce((sum, a) => sum + a.tickets, 0);
+                            const gameUserGames = userGames.filter(ug => ug.game_id === game.id);
+                            const availableTickets = calculateAvailableTickets(gameUserGames);
 
                             return (
                                 <TableRow key={game.id}>
@@ -38,8 +44,9 @@ const FullSchedule = ({ games, attendance, users, onToggleAttendance }) => {
                                     <TableCell>{game.time}</TableCell>
                                     <TableCell>{game.opponent}</TableCell>
                                     {users.map(user => {
-                                        const userAttendance = gameAttendance.find(a => a.user_id === user.id);
-                                        const attending = userAttendance && userAttendance.tickets === 0;
+                                        const userGame = gameUserGames.find(ug => ug.user_id === user.id);
+                                        const attending = userGame && userGame.tickets > 0;
+                                        const ticketCount = userGame ? userGame.tickets : 0;
                                         return (
                                             <TableCell key={user.id}>
                                                 <Button 
@@ -52,7 +59,7 @@ const FullSchedule = ({ games, attendance, users, onToggleAttendance }) => {
                                                     }}
                                                     onClick={() => onToggleAttendance(game.id, user.id, attending ? 'attending' : 'not attending')}
                                                 >
-                                                    {attending ? 'Attending' : 'Not Attending'}
+                                                    {attending ? `Attending (${ticketCount})` : 'Not Attending'}
                                                 </Button>
                                             </TableCell>
                                         );
