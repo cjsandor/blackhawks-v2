@@ -42,8 +42,8 @@ const AttendancePage = () => {
   
     const attendanceData = users.map(user => {
       const userGameRecords = userGames.filter(ug => ug.user_id === user.id);
-      const gamesAttended = userGameRecords.filter(ug => ug.tickets === 0).length;
-      const ticketsClaimed = userGameRecords.reduce((sum, ug) => sum + ug.tickets, 0);
+      const gamesAttended = userGameRecords.filter(ug => ug.tickets > 0).length;
+      const ticketsClaimed = userGameRecords.reduce((sum, ug) => sum + Math.max(0, ug.tickets - 1), 0);
       const totalAllocatedTickets = games.length;
       const delta = totalAllocatedTickets - gamesAttended - ticketsClaimed;
   

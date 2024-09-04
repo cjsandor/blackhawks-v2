@@ -181,7 +181,6 @@ const HomePage = () => {
 
   return (
     <Layout>
-      <Typography variant="h4" gutterBottom>Home</Typography>
       <Grid container spacing={4}>
         <Grid item xs={12}>
           <UpcomingGames 

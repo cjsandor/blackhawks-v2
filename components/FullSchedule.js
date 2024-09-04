@@ -7,8 +7,40 @@ import {
     TableRow, 
     Paper, 
     Typography,
-    Button
+    Chip
 } from '@mui/material';
+import { styled } from '@mui/material/styles';
+
+const StyledTableRow = styled(TableRow)(({ theme }) => ({
+    '&:nth-of-type(odd)': {
+      backgroundColor: theme.palette.action.hover,
+    },
+    '&:last-child td, &:last-child th': {
+      border: 0,
+    },
+    '&:hover': {
+      backgroundColor: theme.palette.action.selected,
+    },
+  }));
+  
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { timeZone: 'UTC' });
+};
+
+const formatTime = (timeString) => {
+    return timeString.slice(0, 5); // This will show time as "HH:MM"
+};
+
+  const AttendanceChip = styled(Chip)(({ theme, status }) => ({
+    width: '100%',
+    color: status === 'ATTENDING' ? theme.palette.success.contrastText : theme.palette.error.contrastText,
+    backgroundColor: status === 'ATTENDING' ? theme.palette.success.light : theme.palette.error.light,
+    '&:hover': {
+      backgroundColor: status === 'ATTENDING' ? theme.palette.success.main : theme.palette.error.main,
+    },
+  }));
+
 
 const FullSchedule = ({ games, userGames, users, onToggleAttendance }) => {
     const calculateAvailableTickets = (gameUserGames) => {
@@ -37,11 +69,12 @@ const FullSchedule = ({ games, userGames, users, onToggleAttendance }) => {
                         {games.map(game => {
                             const gameUserGames = userGames.filter(ug => ug.game_id === game.id);
                             const availableTickets = calculateAvailableTickets(gameUserGames);
-
+                            const allTicketsClaimed = availableTickets === 0;
+                        
                             return (
-                                <TableRow key={game.id}>
-                                    <TableCell>{new Date(game.date).toLocaleDateString()}</TableCell>
-                                    <TableCell>{game.time}</TableCell>
+                                <StyledTableRow key={game.id}>
+                                    <TableCell>{formatDate(game.date)}</TableCell>
+                                    <TableCell>{formatTime(game.time)}</TableCell>
                                     <TableCell>{game.opponent}</TableCell>
                                     {users.map(user => {
                                         const userGame = gameUserGames.find(ug => ug.user_id === user.id);
@@ -49,23 +82,18 @@ const FullSchedule = ({ games, userGames, users, onToggleAttendance }) => {
                                         const ticketCount = userGame ? userGame.tickets : 0;
                                         return (
                                             <TableCell key={user.id}>
-                                                <Button 
-                                                    variant="contained" 
-                                                    style={{
-                                                        backgroundColor: attending ? '#90EE90' : '#FFCCCB',
-                                                        color: 'black',
-                                                        width: '120px',
-                                                        height: '36px'
-                                                    }}
+                                                <AttendanceChip
+                                                    label={attending ? `Attending (${ticketCount})` : 'Not Attending'}
+                                                    status={attending ? 'ATTENDING' : 'NOT_ATTENDING'}
                                                     onClick={() => onToggleAttendance(game.id, user.id, attending ? 'attending' : 'not attending')}
-                                                >
-                                                    {attending ? `Attending (${ticketCount})` : 'Not Attending'}
-                                                </Button>
+                                                    disabled={allTicketsClaimed && !attending}
+                                                    clickable={!allTicketsClaimed || attending}
+                                                />
                                             </TableCell>
                                         );
                                     })}
                                     <TableCell align="center">{availableTickets}</TableCell>
-                                </TableRow>
+                                </StyledTableRow>
                             );
                         })}
                     </TableBody>

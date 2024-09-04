@@ -6,7 +6,6 @@ import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { Box, Tabs, Tab, Typography } from '@mui/material';
 import Layout from '../components/Layout';
 import LoginForm from '../components/LoginForm';
-import RegistrationForm from '../components/RegistrationForm';
 
 const LoginPage = () => {
   const [tabValue, setTabValue] = useState(0);
@@ -30,31 +29,14 @@ const LoginPage = () => {
     }
   };
 
-  const handleRegister = async (email, password, name) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name }
-      }
-    });
-    if (error) {
-      alert(error.message);
-    } else {
-      alert('Registration successful! Please check your email to verify your account.');
-    }
-  };
-
   return (
     <Layout>
       <Box sx={{ width: '100%', maxWidth: 400, margin: 'auto', mt: 4 }}>
         <Tabs value={tabValue} onChange={handleTabChange} centered>
           <Tab label="Login" />
-          <Tab label="Register" />
         </Tabs>
         <Box sx={{ mt: 2 }}>
           {tabValue === 0 && <LoginForm onSubmit={handleLogin} />}
-          {tabValue === 1 && <RegistrationForm onSubmit={handleRegister} />}
         </Box>
       </Box>
     </Layout>

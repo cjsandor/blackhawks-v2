@@ -58,6 +58,15 @@ const GameCard = ({ opponent, date, time, availableTickets, onClaimTickets, game
     }
   };
 
+  const formatDate = (dateString) => {
+    const date = new Date(dateString + 'T00:00:00Z'); // Ensure UTC interpretation
+    return date.toLocaleDateString('en-US', { timeZone: 'UTC' });
+  };
+
+  const formatTime = (timeString) => {
+    return timeString.slice(0, 5); // This will show time as "HH:MM"
+  };
+
   return (
     <StyledCard>
       <CardContent>
@@ -67,15 +76,18 @@ const GameCard = ({ opponent, date, time, availableTickets, onClaimTickets, game
         <Box display="flex" alignItems="center" mb={1}>
           <EventIcon fontSize="small" color="action" />
           <Typography variant="body2" color="text.secondary" ml={1}>
-            {new Date(date).toLocaleDateString()}
+            {formatDate(date)}
           </Typography>
         </Box>
         <Box display="flex" alignItems="center" mb={1}>
           <AccessTimeIcon fontSize="small" color="action" />
           <Typography variant="body2" color="text.secondary" ml={1}>
-            {time}
+            {formatTime(time)}
           </Typography>
         </Box>
+        <Typography variant="body2" color="text.secondary" mb={2}>
+          Available Tickets: {availableTickets}
+        </Typography>
         <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
           <Typography variant="body2">Tickets to claim:</Typography>
           <Box display="flex" alignItems="center">
@@ -119,7 +131,7 @@ const UpcomingGames = ({ games, userGames, onClaimTickets, userId }) => {
 
   return (
     <Box sx={{ flexGrow: 1, p: 3 }}>
-      <Typography variant="h4" component="h2" gutterBottom>
+      <Typography variant="h4" component="h2" gutterBottom align="center">
         Upcoming Games
       </Typography>
       <Grid container spacing={3}>
